@@ -1,4 +1,4 @@
-# Your Task
+# PicMonkey Task
 
 You are developing a program for NotAScam Inc., a multi-level marketing company. 
 The company has a database of its sales associates and sales that each associate makes. 
@@ -31,10 +31,10 @@ each recruiter is also an associate. The top of tree is also an associate; the o
 doesn't have a recruiter. 
 
 So for NotAScam Inc.'s database, it might looks like this:
-![DB Info](https://drive.google.com/file/d/1mEKLZ18hQFuE8NrtQkHJtqiFUYMMHHqw/view?usp=sharing)
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/K6L45VK/picmonkey-db.png" alt="picmonkey-db" border="0"></a>
 
 And its graph looks like this:
-![Graph Info](https://drive.google.com/file/d/1d0w6I-gvw76HE72GpcVibWfzAIQsxDsi/view?usp=sharing)
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/jWJG9SJ/picmonkey-graph.png" alt="picmonkey-graph" border="0"></a>
 
 2. According to the rule of computing commissions, we can use BFS to visit the Tree and calculate the commission. 
 We use a queue to store all bottom associates and calculate their commissions. And then when one recruiter's all associates f
@@ -43,7 +43,7 @@ finish the update of commission, we start to push this recruiter to queue. This 
 # Test Cases:
 
 1. balance tree 
-![Use Case-1](https://drive.google.com/file/d/17nn9OBzxPWsw_LZMAC8Qr4cXJXlB9DFn/view?usp=sharing)
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/jVYv13t/picmonkey-use-case-1.png" alt="picmonkey-use-case-1" border="0"></a>
 
 2. unbalance tree
-![Use Case-2](https://drive.google.com/file/d/1xAPH_VGULyXaK1igoVkQhz-wI5UsE_O3/view?usp=sharing)
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/KKNC90b/picmonkey-use-case-2.png" alt="picmonkey-use-case-2" border="0"></a><br /><a target='_blank' href='https://imgbb.com/'>instagram logo image</a><br />
