@@ -6,5 +6,5 @@ export default function App() {
   const [user, setUser] = useState(null);
 
   if (!user) return <LoginScreen onLogin={setUser} />;
-  return <EchoGardenDeal user={user} />;
+  return <EchoGardenDeal user={user} onLogout={() => setUser(null)} />;
 }

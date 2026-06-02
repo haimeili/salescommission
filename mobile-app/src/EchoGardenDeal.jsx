@@ -645,8 +645,9 @@ function ExpandGarden({ plants, G, EXPAND_DEALS_DB, ALL_STORES, addToList, listI
 // ─────────────────────────────────────────────
 // MAIN APP
 // ─────────────────────────────────────────────
-export default function EchoGardenDeal() {
+export default function EchoGardenDeal({ user, onLogout }) {
   const [tab, setTab]               = useState(0);
+  const [showLogout, setShowLogout] = useState(false);
   const [subScreen, setSub]         = useState(null);
   const [activePlants, setActivePlants] = useState(INITIAL_PLANTS);
   const [gardenView, setGardenView] = useState("current");
@@ -669,8 +670,8 @@ export default function EchoGardenDeal() {
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [notifScreen, setNotifScreen] = useState("settings");
 
-  const userName  = "Lilly";
-  const firstName = "Lilly";
+  const userName  = user?.name || "Lilly";
+  const firstName = userName.split(" ")[0];
   const appTitle  = `${firstName}'s Garden`;
   const location  = "Mission District, SF";
   const plants    = activePlants;
@@ -1270,6 +1271,12 @@ export default function EchoGardenDeal() {
               <div style={{ width:76,height:76,borderRadius:"50%",background:`linear-gradient(135deg,${G.green},${G.greenDark})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:36,margin:"0 auto 14px",boxShadow:`0 0 0 6px ${G.greenGlow}` }}>{PROFILE.avatar}</div>
               <div style={{ fontSize:20,fontWeight:800,color:G.text,letterSpacing:-0.3 }}>{userName}</div>
               <div style={{ fontSize:12,color:G.textMuted,marginTop:4 }}>📍 {location}</div>
+              {user?.provider&&(
+                <div style={{ marginTop:8,display:"inline-flex",alignItems:"center",gap:6,background:G.bg3,border:`1px solid ${G.border}`,borderRadius:20,padding:"4px 12px" }}>
+                  <span style={{ fontSize:13 }}>{user.provider==="google"?"🔵":user.provider==="apple"?"⚫":"📧"}</span>
+                  <span style={{ fontSize:11,color:G.textMuted }}>Signed in with {user.provider==="guest"?"guest access":user.provider.charAt(0).toUpperCase()+user.provider.slice(1)}</span>
+                </div>
+              )}
             </div>
             <div style={{ display:"flex",background:G.bg2,borderRadius:14,padding:3,marginBottom:18,border:`1px solid ${G.border}` }}>
               {[["stats","📊 Stats"],["badges","🏆 Badges"],["history","📅 History"]].map(([key,label])=>(
@@ -1330,6 +1337,11 @@ export default function EchoGardenDeal() {
                 ))}
               </div>
             )}
+
+            {/* Logout button */}
+            <button onClick={()=>setShowLogout(true)} style={{ width:"100%",marginTop:8,padding:"14px",borderRadius:15,border:`1.5px solid ${G.red}44`,background:`${G.red}0d`,color:G.red,fontSize:14,fontFamily:"Georgia,serif",fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8 }}>
+              ↩ Sign Out
+            </button>
           </div>
         )}
       </div>
@@ -1365,6 +1377,24 @@ export default function EchoGardenDeal() {
             <div style={{ display:"flex",gap:10 }}>
               <button onClick={()=>setNewSeason(false)} style={{ flex:1,background:"transparent",border:`1px solid ${G.border}`,borderRadius:13,padding:"13px",color:G.textMuted,fontSize:14,fontFamily:"Georgia,serif",cursor:"pointer" }}>Cancel</button>
               <button onClick={()=>{setActivePlants([]);setNewSeason(false);setExpanded(null);showToast("🌿 Garden cleared — ready for new season!");}} style={{ flex:2,background:`linear-gradient(135deg,${G.green},${G.greenDark})`,border:"none",borderRadius:13,padding:"13px",color:"#fff",fontSize:14,fontFamily:"Georgia,serif",fontWeight:700,cursor:"pointer" }}>Start new season →</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Logout confirmation sheet */}
+      {showLogout&&(
+        <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center" }} onClick={()=>setShowLogout(false)}>
+          <div onClick={e=>e.stopPropagation()} style={{ background:G.bg2,borderRadius:"24px 24px 0 0",width:"100%",maxWidth:430,padding:"28px 24px 48px",border:`1px solid ${G.border}`,animation:"sheetUp 0.35s cubic-bezier(0.34,1.2,0.64,1) both" }}>
+            <div style={{ width:40,height:4,borderRadius:2,background:G.bg3,margin:"0 auto 24px" }} />
+            <div style={{ textAlign:"center",marginBottom:24 }}>
+              <div style={{ width:64,height:64,borderRadius:"50%",background:`${G.red}18`,border:`2px solid ${G.red}33`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,margin:"0 auto 14px" }}>↩</div>
+              <div style={{ fontSize:20,fontWeight:800,color:G.text,marginBottom:8 }}>Sign out?</div>
+              <div style={{ fontSize:13,color:G.textMuted,lineHeight:1.8 }}>You'll need to sign in again to access your garden.</div>
+            </div>
+            <div style={{ display:"flex",gap:10 }}>
+              <button onClick={()=>setShowLogout(false)} style={{ flex:1,background:"transparent",border:`1px solid ${G.border}`,borderRadius:13,padding:"14px",color:G.textMuted,fontSize:14,fontFamily:"Georgia,serif",cursor:"pointer" }}>Cancel</button>
+              <button onClick={()=>{ setShowLogout(false); onLogout(); }} style={{ flex:2,background:`linear-gradient(135deg,${G.red},#b03030)`,border:"none",borderRadius:13,padding:"14px",color:"#fff",fontSize:14,fontFamily:"Georgia,serif",fontWeight:700,cursor:"pointer" }}>Sign Out</button>
             </div>
           </div>
         </div>
