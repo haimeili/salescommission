@@ -670,10 +670,29 @@ export default function EchoGardenDeal({ user, onLogout }) {
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [notifScreen, setNotifScreen] = useState("settings");
 
+  const [location, setLocation] = useState("Locating…");
+
+  useEffect(() => {
+    if(!navigator.geolocation) { setLocation("Location unavailable"); return; }
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          const res  = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${coords.latitude}&lon=${coords.longitude}&format=json`);
+          const data = await res.json();
+          const a    = data.address;
+          const area = a.neighbourhood || a.suburb || a.village || a.town || a.city_district || "";
+          const city = a.city || a.town || a.county || "";
+          setLocation([area, city].filter(Boolean).join(", ") || data.display_name.split(",")[0]);
+        } catch { setLocation("Location unavailable"); }
+      },
+      () => setLocation("Location unavailable"),
+      { timeout: 8000 }
+    );
+  }, []);
+
   const userName  = user?.name || "Lilly";
   const firstName = userName.split(" ")[0];
   const appTitle  = `${firstName}'s Garden`;
-  const location  = "Mission District, SF";
   const plants    = activePlants;
   const activeStores = [1,2,3];
 
@@ -1268,7 +1287,10 @@ export default function EchoGardenDeal({ user, onLogout }) {
         {tab===3&&(
           <div>
             <div style={{ textAlign:"center",marginBottom:22,padding:"8px 0" }}>
-              <div style={{ width:76,height:76,borderRadius:"50%",background:`linear-gradient(135deg,${G.green},${G.greenDark})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:36,margin:"0 auto 14px",boxShadow:`0 0 0 6px ${G.greenGlow}` }}>{PROFILE.avatar}</div>
+              {user?.avatar
+                ? <img src={user.avatar} alt={userName} style={{ width:76,height:76,borderRadius:"50%",objectFit:"cover",margin:"0 auto 14px",display:"block",boxShadow:`0 0 0 6px ${G.greenGlow}`,border:`2px solid ${G.green}` }} />
+                : <div style={{ width:76,height:76,borderRadius:"50%",background:`linear-gradient(135deg,${G.green},${G.greenDark})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:36,margin:"0 auto 14px",boxShadow:`0 0 0 6px ${G.greenGlow}` }}>{firstName[0]?.toUpperCase()||"🌿"}</div>
+              }
               <div style={{ fontSize:20,fontWeight:800,color:G.text,letterSpacing:-0.3 }}>{userName}</div>
               <div style={{ fontSize:12,color:G.textMuted,marginTop:4 }}>📍 {location}</div>
               {user?.provider&&(
