@@ -84,18 +84,20 @@ export default function LoginScreen({ onLogin }) {
   // ── Google OAuth ──────────────────────────────────────────────────────────
   const googleLogin = useGoogleLogin({
     flow: "implicit",
+    // Request Photos access at login so scan works without a second prompt
+    scope: "https://www.googleapis.com/auth/photoslibrary.readonly",
     onSuccess: async (tokenResponse) => {
       try {
-        // Fetch the user's profile from Google
         const res  = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
           headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
         });
         const info = await res.json();
         onLogin({
-          name:     info.name || info.email.split("@")[0],
-          email:    info.email,
-          avatar:   info.picture,
-          provider: "google",
+          name:        info.name || info.email.split("@")[0],
+          email:       info.email,
+          avatar:      info.picture,
+          provider:    "google",
+          accessToken: tokenResponse.access_token,
         });
       } catch {
         setError("Google sign-in succeeded but profile fetch failed. Try again.");

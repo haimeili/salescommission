@@ -384,75 +384,166 @@ function MatchRow({ plant, deals, type, arrowColor, arrowIcon, isExpanded, onTog
 // ─────────────────────────────────────────────
 // SCAN SUB-SCREEN
 // ─────────────────────────────────────────────
-function ScanSubScreen({ onBack, onDone, G, CSS }) {
-  const [scanProg, setScanProg] = useState(0);
-  const [msgIdx, setMsgIdx]     = useState(0);
-  const [revealed, setRevealed] = useState([]);
-  const [screen, setScreen]     = useState("scan");
-  const [confirmed, setConfirmed] = useState(INITIAL_PLANTS.map(p=>p.id));
+function ScanSubScreen({ onBack, onDone, G, CSS, user }) {
+  const [screen, setScreen]       = useState("scan");   // "scan"|"confirm"|"error"
+  const [progress, setProgress]   = useState(0);
+  const [statusMsg, setStatusMsg] = useState("Connecting to Google Photos…");
+  const [foundPhotos, setFoundPhotos] = useState([]);
+  const [detected, setDetected]   = useState([]); // INITIAL_PLANTS-shaped objects
+  const [confirmed, setConfirmed] = useState([]);
+  const [errorMsg, setErrorMsg]   = useState("");
 
-  useEffect(()=>{
-    if(screen!=="scan") return;
-    let p=0,mi=0;
-    const iv=setInterval(()=>{
-      p+=Math.random()*5+1.5; if(p>100)p=100;
-      setScanProg(Math.round(p));
-      const nm=Math.min(Math.floor((p/100)*SCAN_MSGS.length),SCAN_MSGS.length-1);
-      if(nm!==mi){mi=nm;setMsgIdx(nm);}
-      setRevealed(INITIAL_PLANTS.slice(0,Math.floor((p/100)*INITIAL_PLANTS.length)).map(x=>x.id));
-      if(p>=100){clearInterval(iv);setTimeout(()=>setScreen("confirm"),500);}
-    },160);
-    return()=>clearInterval(iv);
-  },[screen]);
+  const VISION_KEY = import.meta.env.VITE_GOOGLE_VISION_KEY || "";
 
-  if(screen==="scan") return (
+  useEffect(() => {
+    if (screen !== "scan") return;
+    runScan();
+  }, [screen]);
+
+  async function runScan() {
+    try {
+      // ── 1. Fetch garden photos from Google Photos ────────────────────────
+      if (!user?.accessToken) throw new Error("no_token");
+      setStatusMsg("Connecting to Google Photos…");
+      setProgress(5);
+
+      const { fetchGardenPhotos, detectPlantsInPhoto, matchPlantFromLabels } =
+        await import("./googlePhotos.js");
+
+      const photos = await fetchGardenPhotos(user.accessToken);
+      setFoundPhotos(photos);
+
+      if (photos.length === 0) {
+        setStatusMsg("No garden photos found in your library.");
+        setProgress(100);
+        setTimeout(() => setScreen("confirm"), 600);
+        return;
+      }
+
+      // ── 2. Run Vision API on each photo ──────────────────────────────────
+      if (!VISION_KEY) throw new Error("no_vision_key");
+
+      const found = new Map(); // plantId → plant entry
+      const msgs  = [
+        "Filtering outdoor & garden scenes…",
+        "Running AI plant recognition…",
+        "Identifying species & growth stages…",
+        "Mapping plants to your garden…",
+        "Almost done…",
+      ];
+
+      for (let i = 0; i < photos.length; i++) {
+        const pct = Math.round(10 + (i / photos.length) * 85);
+        setProgress(pct);
+        setStatusMsg(msgs[Math.min(Math.floor((i / photos.length) * msgs.length), msgs.length - 1)]);
+
+        try {
+          const vision  = await detectPlantsInPhoto(photos[i].baseUrl, VISION_KEY);
+          const plantId = matchPlantFromLabels(vision);
+          if (plantId && !found.has(plantId)) {
+            const base = INITIAL_PLANTS.find(p => p.id === plantId);
+            if (base) {
+              const conf = Math.round((vision.labelAnnotations?.[0]?.score || 0.88) * 100);
+              found.set(plantId, {
+                ...base,
+                thumb: `${photos[i].baseUrl}=w200-h200`,
+                photoConfidence: conf,
+                firstSeenDate:   new Date(),
+                userStatus:      null,
+              });
+            }
+          }
+        } catch { /* skip single-photo failure */ }
+      }
+
+      setProgress(100);
+      setStatusMsg("Done!");
+      const results = [...found.values()];
+      setDetected(results.length ? results : INITIAL_PLANTS);
+      setConfirmed((results.length ? results : INITIAL_PLANTS).map(p => p.id));
+      setTimeout(() => setScreen("confirm"), 500);
+
+    } catch (err) {
+      if (err.message === "no_token") {
+        setErrorMsg("Sign in with Google first to scan your photos.");
+      } else if (err.message === "no_vision_key") {
+        setErrorMsg("VITE_GOOGLE_VISION_KEY not set — see setup instructions below.");
+      } else {
+        setErrorMsg(`Photos scan failed: ${err.message}`);
+      }
+      setScreen("error");
+    }
+  }
+
+  // ── Error screen ──────────────────────────────────────────────────────────
+  if (screen === "error") return (
+    <div style={{ fontFamily:"Georgia,serif",background:G.bg,minHeight:"100vh",maxWidth:430,margin:"0 auto",padding:"60px 24px 40px" }}>
+      <style>{CSS}</style>
+      <button onClick={onBack} style={{ background:"transparent",border:"none",color:G.textMuted,fontSize:12,fontFamily:"Georgia,serif",cursor:"pointer",marginBottom:28 }}>← Back</button>
+      <div style={{ textAlign:"center",marginBottom:24 }}>
+        <div style={{ fontSize:48,marginBottom:14 }}>⚠️</div>
+        <div style={{ fontSize:18,fontWeight:800,color:G.text,marginBottom:8 }}>Scan couldn't complete</div>
+        <div style={{ fontSize:13,color:G.textMuted,lineHeight:1.8,marginBottom:20 }}>{errorMsg}</div>
+      </div>
+      {errorMsg.includes("VISION_KEY") && (
+        <div style={{ background:G.bg2,borderRadius:16,padding:"16px 18px",border:`1px solid ${G.border}`,marginBottom:20,fontSize:12,color:G.textMuted,lineHeight:2 }}>
+          <div style={{ fontWeight:800,color:G.text,marginBottom:8 }}>To enable plant detection:</div>
+          <div>1. Go to <strong style={{color:G.green}}>console.cloud.google.com</strong></div>
+          <div>2. Enable <strong style={{color:G.green}}>Cloud Vision API</strong></div>
+          <div>3. Create an <strong style={{color:G.green}}>API Key</strong></div>
+          <div>4. Add it as <strong style={{color:G.green}}>VITE_GOOGLE_VISION_KEY</strong> and rebuild</div>
+        </div>
+      )}
+      <button onClick={() => { setScreen("scan"); setProgress(0); setErrorMsg(""); }} style={{ width:"100%",background:`linear-gradient(135deg,${G.green},${G.greenDark})`,border:"none",borderRadius:14,padding:"14px",color:"#fff",fontSize:14,fontFamily:"Georgia,serif",fontWeight:700,cursor:"pointer",marginBottom:10 }}>Try again</button>
+      <button onClick={onBack} style={{ width:"100%",background:"transparent",border:`1px solid ${G.border}`,borderRadius:14,padding:"13px",color:G.textMuted,fontSize:13,fontFamily:"Georgia,serif",cursor:"pointer" }}>Cancel</button>
+    </div>
+  );
+
+  // ── Scanning screen ───────────────────────────────────────────────────────
+  if (screen === "scan") return (
     <div style={{ fontFamily:"Georgia,serif",background:G.bg,minHeight:"100vh",maxWidth:430,margin:"0 auto",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"40px 28px",position:"relative" }}>
       <style>{CSS}</style>
       <button onClick={onBack} style={{ position:"absolute",top:52,left:20,background:G.bg2,border:`1px solid ${G.border}`,borderRadius:20,padding:"7px 15px",color:G.textDim,fontSize:12,fontFamily:"Georgia,serif",cursor:"pointer" }}>← Back</button>
+
+      {/* Photo grid preview */}
       <div style={{ width:188,height:188,borderRadius:24,background:G.bg2,position:"relative",overflow:"hidden",marginBottom:26,border:`1.5px solid ${G.borderBright}`,boxShadow:`0 0 48px ${G.greenGlow}` }}>
         <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:3,padding:3,height:"100%" }}>
-          {["🍅","🌿","🏠","🥒","📸","🌶️","🌳","🥬","🌻"].map((e,i)=>(
-            <div key={i} style={{ background:revealed.length>0&&i<3?`${G.green}22`:G.bg3,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,opacity:revealed.length>0&&i<3?1:0.25,transition:"all 0.5s",border:revealed.length>0&&i<3?`1px solid ${G.green}66`:"1px solid transparent" }}>{e}</div>
+          {foundPhotos.slice(0,9).map((ph,i) => (
+            <div key={i} style={{ borderRadius:6,overflow:"hidden",background:G.bg3 }}>
+              <img src={`${ph.baseUrl}=w80-h80`} alt="" style={{ width:"100%",height:"100%",objectFit:"cover",display:"block" }} />
+            </div>
+          ))}
+          {Array.from({length:Math.max(0,9-foundPhotos.length)}).map((_,i)=>(
+            <div key={`e${i}`} style={{ background:G.bg3,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,opacity:0.2 }}>🌿</div>
           ))}
         </div>
         <div style={{ position:"absolute",left:0,right:0,height:2,background:`linear-gradient(90deg,transparent,${G.green},transparent)`,animation:"scanLine 1.8s ease-in-out infinite",boxShadow:`0 0 10px ${G.green}` }} />
       </div>
-      <div style={{ fontSize:19,fontWeight:800,color:G.text,marginBottom:6 }}>Scanning your garden…</div>
-      <div style={{ fontSize:13,color:G.green,marginBottom:22,minHeight:20,textAlign:"center" }}>{SCAN_MSGS[msgIdx]}</div>
+
+      <div style={{ fontSize:19,fontWeight:800,color:G.text,marginBottom:6 }}>Scanning Google Photos…</div>
+      <div style={{ fontSize:13,color:G.green,marginBottom:22,minHeight:20,textAlign:"center" }}>{statusMsg}</div>
       <div style={{ width:"100%",height:6,background:G.bg3,borderRadius:3,overflow:"hidden",marginBottom:6 }}>
-        <div style={{ height:"100%",borderRadius:3,width:`${scanProg}%`,background:`linear-gradient(90deg,${G.greenDark},${G.green})`,transition:"width 0.2s" }} />
+        <div style={{ height:"100%",borderRadius:3,width:`${progress}%`,background:`linear-gradient(90deg,${G.greenDark},${G.green})`,transition:"width 0.4s" }} />
       </div>
-      <div style={{ fontSize:12,color:G.textMuted,marginBottom:24 }}>{scanProg}%</div>
-      {revealed.length>0&&(
-        <div style={{ width:"100%" }}>
-          <div style={{ fontSize:10,color:G.textMuted,letterSpacing:2,marginBottom:10,textTransform:"uppercase" }}>Found so far</div>
-          <div style={{ display:"flex",flexWrap:"wrap",gap:8 }}>
-            {INITIAL_PLANTS.filter(p=>revealed.includes(p.id)).map(p=>(
-              <div key={p.id} style={{ background:G.bg2,border:`1px solid ${G.borderBright}`,borderRadius:24,padding:"5px 12px",display:"flex",alignItems:"center",gap:6 }}>
-                <span style={{ fontSize:14 }}>{p.emoji}</span>
-                <span style={{ fontSize:12,color:G.text,fontWeight:700 }}>{p.name}</span>
-                <span style={{ fontSize:10,color:G.green }}>{p.photoConfidence}%</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <div style={{ fontSize:12,color:G.textMuted }}>{progress}% · {foundPhotos.length} photos found</div>
     </div>
   );
+
+  // ── Confirm screen ────────────────────────────────────────────────────────
   return (
     <div style={{ fontFamily:"Georgia,serif",background:G.bg,minHeight:"100vh",maxWidth:430,margin:"0 auto",padding:"52px 22px 40px" }}>
       <style>{CSS}</style>
       <div style={{ textAlign:"center",marginBottom:22 }}>
         <div style={{ width:58,height:58,borderRadius:"50%",background:`linear-gradient(135deg,${G.green},${G.greenDark})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,margin:"0 auto 13px",boxShadow:`0 0 28px ${G.greenGlow}` }}>✓</div>
-        <div style={{ fontSize:20,fontWeight:800,color:G.text }}>{INITIAL_PLANTS.length} plants found!</div>
+        <div style={{ fontSize:20,fontWeight:800,color:G.text }}>{detected.length} plants detected!</div>
         <div style={{ fontSize:12,color:G.textMuted,marginTop:4 }}>Tap to deselect anything that's not yours</div>
       </div>
-      {INITIAL_PLANTS.map((p,i)=>(
+      {detected.map((p,i)=>(
         <div key={p.id} onClick={()=>setConfirmed(s=>s.includes(p.id)?s.filter(x=>x!==p.id):[...s,p.id])} style={{ display:"flex",alignItems:"center",gap:12,background:confirmed.includes(p.id)?G.bg3:G.bg2,borderRadius:14,padding:"12px 14px",marginBottom:8,border:`1.5px solid ${confirmed.includes(p.id)?G.borderBright:G.border}`,cursor:"pointer",transition:"all 0.2s",animation:`fadeUp 0.4s ease ${i*0.06}s both` }}>
           <PlantPhoto src={p.thumb} emoji={p.emoji} color={p.color} size={46} radius={12} border={`2px solid ${confirmed.includes(p.id)?p.color:G.border}`} />
           <div style={{ flex:1 }}>
             <div style={{ fontSize:14,fontWeight:700,color:G.text }}>{p.name}</div>
-            <div style={{ fontSize:11,color:G.textMuted,marginTop:1 }}>{p.bed}</div>
+            <div style={{ fontSize:11,color:G.textMuted,marginTop:1 }}>Detected from your photos</div>
             {confirmed.includes(p.id)&&<StatusBadge plant={p} compact />}
           </div>
           <Pill color={G.green}>{p.photoConfidence}%</Pill>
@@ -460,8 +551,8 @@ function ScanSubScreen({ onBack, onDone, G, CSS }) {
         </div>
       ))}
       <div style={{ fontSize:11,color:G.textMuted,textAlign:"center",marginBottom:16,marginTop:8 }}>{confirmed.length} selected</div>
-      <button onClick={()=>onDone(INITIAL_PLANTS.filter(p=>confirmed.includes(p.id)))} style={{ background:`linear-gradient(135deg,${G.green},${G.greenDark})`,border:"none",borderRadius:16,padding:"16px",color:"#fff",fontSize:15,fontFamily:"Georgia,serif",fontWeight:700,cursor:"pointer",width:"100%",boxShadow:`0 8px 24px ${G.greenGlow}` }}>
-        Confirm {confirmed.length} plants →
+      <button onClick={()=>onDone(detected.filter(p=>confirmed.includes(p.id)))} style={{ background:`linear-gradient(135deg,${G.green},${G.greenDark})`,border:"none",borderRadius:16,padding:"16px",color:"#fff",fontSize:15,fontFamily:"Georgia,serif",fontWeight:700,cursor:"pointer",width:"100%",boxShadow:`0 8px 24px ${G.greenGlow}` }}>
+        Add {confirmed.length} plants to my garden →
       </button>
       <button onClick={()=>setScreen("scan")} style={{ background:"transparent",border:"none",color:G.textMuted,fontSize:13,fontFamily:"Georgia,serif",cursor:"pointer",padding:"12px 8px",width:"100%",marginTop:4 }}>← Scan again</button>
     </div>
@@ -728,7 +819,7 @@ export default function EchoGardenDeal({ user, onLogout }) {
   const NAV=[{label:"Garden",icon:"🌱"},{label:"Deals",icon:"🏷️"},{label:"For You",icon:"✨"},{label:"Profile",icon:"👤"}];
 
   // ── Sub-screens ──────────────────────────────
-  if(subScreen==="scan") return <ScanSubScreen onBack={()=>setSub(null)} onDone={newP=>{setActivePlants(newP);setSub(null);showToast(`✓ ${newP.length} plants identified!`);}} G={G} CSS={CSS} />;
+  if(subScreen==="scan") return <ScanSubScreen onBack={()=>setSub(null)} onDone={newP=>{setActivePlants(newP);setSub(null);showToast(`✓ ${newP.length} plants identified!`);}} G={G} CSS={CSS} user={user} />;
 
   if(subScreen==="list") return (
     <div style={{ fontFamily:"Georgia,serif",background:G.bg,minHeight:"100vh",maxWidth:430,margin:"0 auto" }}>
