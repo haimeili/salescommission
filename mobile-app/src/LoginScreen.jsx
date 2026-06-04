@@ -84,8 +84,8 @@ export default function LoginScreen({ onLogin }) {
   // ── Google OAuth ──────────────────────────────────────────────────────────
   const googleLogin = useGoogleLogin({
     flow: "implicit",
-    // Request Photos access at login so scan works without a second prompt
     scope: "https://www.googleapis.com/auth/photoslibrary.readonly",
+    prompt: "consent",
     onSuccess: async (tokenResponse) => {
       try {
         const res  = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
