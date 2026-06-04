@@ -145,6 +145,9 @@ export default function AutoScanScreen({ user, onDone, onSkip }) {
 
   useEffect(() => {
     aborted.current = false;
+    // Log that scan started
+    const d = JSON.parse(localStorage.getItem("scanDebug") || "{}");
+    localStorage.setItem("scanDebug", JSON.stringify({...d, scanStarted: new Date().toISOString(), scanPhase:"fetching"}));
     runScan();
     return () => { aborted.current = true; };
   }, []);
@@ -156,6 +159,10 @@ export default function AutoScanScreen({ user, onDone, onSkip }) {
 
       const fetched = await fetchGardenPhotos(user.accessToken, 2);
       if (aborted.current) return;
+
+      // Log photos found
+      const d2 = JSON.parse(localStorage.getItem("scanDebug") || "{}");
+      localStorage.setItem("scanDebug", JSON.stringify({...d2, photosFound: fetched.length, scanPhase:"fetched"}));
 
       setPhotos(fetched);
       setGridPhotos(fetched.slice(0, 9));
@@ -208,7 +215,10 @@ export default function AutoScanScreen({ user, onDone, onSkip }) {
 
     } catch (err) {
       if (!aborted.current) {
-        setStatusMsg(err.message || String(err));
+        const msg = err.message || String(err);
+        const d3 = JSON.parse(localStorage.getItem("scanDebug") || "{}");
+        localStorage.setItem("scanDebug", JSON.stringify({...d3, scanError: msg, scanPhase:"error"}));
+        setStatusMsg(msg);
         setPhase("error");
       }
     }

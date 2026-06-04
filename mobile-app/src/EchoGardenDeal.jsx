@@ -743,6 +743,7 @@ export default function EchoGardenDeal({ user, onLogout, initialPlants }) {
   const [activePlants, setActivePlants] = useState(
     initialPlants && initialPlants.length > 0 ? initialPlants : INITIAL_PLANTS
   );
+  const [debugInfo, setDebugInfo]   = useState(null);
   const [gardenView, setGardenView] = useState("current");
   const [expandedPlant, setExpanded]= useState(null);
   const [expandedMatch, setExpandedMatch] = useState(null);
@@ -764,6 +765,18 @@ export default function EchoGardenDeal({ user, onLogout, initialPlants }) {
   const [notifScreen, setNotifScreen] = useState("settings");
 
   const [location, setLocation] = useState("Locating…");
+
+  // ── Diagnostic toast: read scan debug from localStorage ─────────────────
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("scanDebug");
+      if (raw) {
+        const d = JSON.parse(raw);
+        setDebugInfo(d);
+        setTimeout(() => setDebugInfo(null), 30000);
+      }
+    } catch {}
+  }, []);
 
   useEffect(() => {
     if(!navigator.geolocation) { setLocation("Location unavailable"); return; }
@@ -1460,6 +1473,21 @@ export default function EchoGardenDeal({ user, onLogout, initialPlants }) {
           </div>
         )}
       </div>
+
+      {/* Debug banner — shows scan result for 30s after login */}
+      {debugInfo && (
+        <div style={{ position:"fixed",top:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,
+          background:"#1a0a00",borderBottom:"2px solid #e0924e",padding:"10px 14px",zIndex:500,
+          fontFamily:"monospace",fontSize:11,color:"#e0924e",lineHeight:1.6 }}>
+          <strong>SCAN DEBUG (tap to dismiss):</strong>
+          <div onClick={() => setDebugInfo(null)} style={{ cursor:"pointer" }}>
+            provider={debugInfo.provider} hasToken={String(debugInfo.hasToken)} willScan={String(debugInfo.willScan)}<br/>
+            scanStarted={debugInfo.scanStarted ? "YES" : "NO"} phase={debugInfo.scanPhase || "?"}<br/>
+            photos={debugInfo.photosFound ?? "?"} error={debugInfo.scanError || "none"}<br/>
+            <span style={{ opacity:0.6 }}>Tap to dismiss</span>
+          </div>
+        </div>
+      )}
 
       {/* Bottom nav */}
       <div style={{ position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:G.bg,borderTop:`1px solid ${G.border}`,padding:"10px 0 24px",display:"flex",justifyContent:"space-around" }}>

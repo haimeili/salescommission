@@ -9,10 +9,19 @@ export default function App() {
   const [scanning, setScanning] = useState(false);
 
   const handleLogin = (userData) => {
+    const willScan = userData.provider === "google" && !!userData.accessToken;
+    localStorage.setItem("scanDebug", JSON.stringify({
+      provider: userData.provider,
+      hasToken: !!userData.accessToken,
+      willScan,
+      loginTime: new Date().toISOString(),
+      scanStarted: null,
+      scanPhase: null,
+      scanError: null,
+      photosFound: null,
+    }));
     setUser(userData);
-    if (userData.provider === "google" && userData.accessToken) {
-      setScanning(true);
-    }
+    if (willScan) setScanning(true);
   };
 
   if (!user) return <LoginScreen onLogin={handleLogin} />;
