@@ -65,7 +65,8 @@ export default function AutoScanScreen({ user, onDone, onSkip }) {
   const [manualQueue, setManualQueue] = useState([]); // photos awaiting manual ID
   const [manualIdx, setManualIdx]     = useState(0);
   const [confirmed, setConfirmed]     = useState([]);
-  const aborted = useRef(false);
+  const aborted      = useRef(false);
+  const latestFound  = useRef(new Map()); // track detected in real-time for Skip handler
 
   const VISION_KEY = import.meta.env.VITE_GOOGLE_VISION_KEY || "";
 
@@ -126,6 +127,7 @@ export default function AutoScanScreen({ user, onDone, onSkip }) {
                 thumb:            `${fetched[i].baseUrl}=w400-h400`,
                 photoConfidence:  conf,
               });
+              latestFound.current = new Map(found);
               setDetected(new Map(found));
             }
           } catch { /* skip single-photo errors */ }
@@ -138,11 +140,21 @@ export default function AutoScanScreen({ user, onDone, onSkip }) {
         setDetected(new Map(found));
         setPhase("confirming");
 
-      // ── Phase 2b: No Vision key — manual identification ───────────────────
+      // ── Phase 2b: No Vision key — assign garden photos as plant thumbnails ─
       } else {
-        setPhase("manual");
-        setManualQueue(fetched.slice(0, 20)); // limit to 20 for manual flow
-        setManualIdx(0);
+        const autoFound = new Map();
+        Object.entries(PLANT_BASE).forEach(([idStr, base], i) => {
+          if (fetched[i]) {
+            const id = Number(idStr);
+            autoFound.set(id, { ...base, id, thumb: `${fetched[i].baseUrl}=w400-h400` });
+          }
+        });
+        latestFound.current = autoFound;
+        setDetected(autoFound);
+        setConfirmed([...autoFound.keys()]);
+        setProgress(100);
+        setStatusMsg(autoFound.size > 0 ? `Found ${fetched.length} garden photos!` : "No garden photos found.");
+        setPhase("confirming");
       }
 
     } catch (err) {
@@ -185,7 +197,14 @@ export default function AutoScanScreen({ user, onDone, onSkip }) {
   if (phase === "fetching" || phase === "scanning") return (
     <div style={{ fontFamily:"Georgia,serif",background:G.bg,minHeight:"100vh",maxWidth:430,margin:"0 auto",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"40px 24px",position:"relative" }}>
       <style>{CSS}</style>
-      <button onClick={onSkip} style={{ position:"absolute",top:52,right:20,background:"transparent",border:`1px solid ${G.border}`,borderRadius:20,padding:"6px 14px",color:G.textMuted,fontSize:12,fontFamily:"Georgia,serif",cursor:"pointer" }}>Skip</button>
+      <button onClick={() => {
+        aborted.current = true;
+        const cur = latestFound.current;
+        setDetected(cur);
+        setConfirmed([...cur.keys()]);
+        setProgress(100);
+        setPhase("confirming");
+      }} style={{ position:"absolute",top:52,right:20,background:"transparent",border:`1px solid ${G.border}`,borderRadius:20,padding:"6px 14px",color:G.textMuted,fontSize:12,fontFamily:"Georgia,serif",cursor:"pointer" }}>Skip</button>
 
       {/* Real photo grid */}
       <div style={{ width:200,height:200,borderRadius:24,overflow:"hidden",background:G.bg2,border:`1.5px solid ${G.borderBright}`,boxShadow:`0 0 48px ${G.greenGlow}`,marginBottom:26,position:"relative",display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:3,padding:3 }}>
@@ -260,7 +279,13 @@ export default function AutoScanScreen({ user, onDone, onSkip }) {
       <div style={{ textAlign:"center",marginBottom:24 }}>
         <div style={{ fontSize:44,marginBottom:14 }}>⚠️</div>
         <div style={{ fontSize:17,fontWeight:800,color:G.text,marginBottom:8 }}>Scan couldn't complete</div>
-        <div style={{ fontSize:13,color:G.textMuted,lineHeight:1.8 }}>{statusMsg}</div>
+        <div style={{ fontSize:13,color:G.textMuted,lineHeight:1.6,marginBottom:10 }}>{statusMsg}</div>
+        <div style={{ fontSize:12,color:G.textMuted,lineHeight:1.7,background:G.bg2,borderRadius:12,padding:"12px 14px",textAlign:"left" }}>
+          <strong style={{ color:G.text }}>To enable photo scanning:</strong>{"\n"}
+          1. Go to console.cloud.google.com{"\n"}
+          2. APIs &amp; Services → Library{"\n"}
+          3. Search "Photos Library API" → Enable
+        </div>
       </div>
       <button onClick={onSkip} style={{ width:"100%",background:`linear-gradient(135deg,${G.green},${G.greenDark})`,border:"none",borderRadius:14,padding:"14px",color:"#fff",fontSize:14,fontFamily:"Georgia,serif",fontWeight:700,cursor:"pointer" }}>
         Enter garden anyway →
