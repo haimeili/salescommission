@@ -208,7 +208,7 @@ export default function AutoScanScreen({ user, onDone, onSkip }) {
 
     } catch (err) {
       if (!aborted.current) {
-        setStatusMsg(err.message);
+        setStatusMsg(err.message || String(err));
         setPhase("error");
       }
     }
@@ -267,6 +267,12 @@ export default function AutoScanScreen({ user, onDone, onSkip }) {
       margin:"0 auto",display:"flex",flexDirection:"column",alignItems:"center",
       justifyContent:"center",padding:"40px 24px",position:"relative" }}>
       <style>{CSS}</style>
+
+      {/* Version stamp — top left for debugging */}
+      <div style={{ position:"absolute",top:52,left:20,fontSize:10,color:G.textMuted,opacity:0.5 }}>
+        v4 · Jun 4
+      </div>
+
       <button onClick={skipToConfirm}
         style={{ position:"absolute",top:52,right:20,background:"transparent",
           border:`1px solid ${G.border}`,borderRadius:20,padding:"6px 14px",
@@ -291,9 +297,18 @@ export default function AutoScanScreen({ user, onDone, onSkip }) {
           animation:"scanLine 1.8s ease-in-out infinite",boxShadow:`0 0 10px ${G.green}` }} />
       </div>
 
-      <div style={{ fontSize:19,fontWeight:800,color:G.text,marginBottom:6 }}>Loading your photos…</div>
-      <div style={{ fontSize:13,color:G.green,marginBottom:6,textAlign:"center",minHeight:20 }}>{statusMsg}</div>
-      <div style={{ fontSize:11,color:G.textMuted,marginBottom:20 }}>Last 2 years · {photos.length} photos</div>
+      <div style={{ fontSize:19,fontWeight:800,color:G.text,marginBottom:6 }}>
+        Loading your photos…
+      </div>
+      <div style={{ fontSize:13,color:G.green,marginBottom:6,textAlign:"center",minHeight:20 }}>
+        {statusMsg}
+      </div>
+      <div style={{ fontSize:12,color:G.textMuted,marginBottom:4 }}>
+        {photos.length > 0 ? `✓ ${photos.length} photos loaded` : "Requesting access…"}
+      </div>
+      <div style={{ fontSize:11,color:G.textMuted,marginBottom:20,opacity:0.6 }}>
+        Signed in as {user?.email}
+      </div>
 
       <div style={{ width:"100%",height:6,background:G.bg3,borderRadius:3,overflow:"hidden",marginBottom:6 }}>
         <div style={{ height:"100%",width:`${progress}%`,
