@@ -736,11 +736,13 @@ function ExpandGarden({ plants, G, EXPAND_DEALS_DB, ALL_STORES, addToList, listI
 // ─────────────────────────────────────────────
 // MAIN APP
 // ─────────────────────────────────────────────
-export default function EchoGardenDeal({ user, onLogout }) {
+export default function EchoGardenDeal({ user, onLogout, initialPlants }) {
   const [tab, setTab]               = useState(0);
   const [showLogout, setShowLogout] = useState(false);
   const [subScreen, setSub]         = useState(null);
-  const [activePlants, setActivePlants] = useState(INITIAL_PLANTS);
+  const [activePlants, setActivePlants] = useState(
+    initialPlants && initialPlants.length > 0 ? initialPlants : INITIAL_PLANTS
+  );
   const [gardenView, setGardenView] = useState("current");
   const [expandedPlant, setExpanded]= useState(null);
   const [expandedMatch, setExpandedMatch] = useState(null);
