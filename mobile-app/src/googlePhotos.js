@@ -1,4 +1,4 @@
-// Google Photos API — fetch garden photos from last N years
+// Google Photos API — fetch recent photos from last N years
 export async function fetchGardenPhotos(accessToken, years = 2) {
   const now   = new Date();
   const start = new Date(now);
@@ -12,12 +12,9 @@ export async function fetchGardenPhotos(accessToken, years = 2) {
           endDate:   { year: now.getFullYear(),   month: now.getMonth() + 1,   day: now.getDate()   },
         }],
       },
-      contentFilter: {
-        includedContentCategories: ["GARDENS", "FOOD_AND_DRINK", "NATURE"],
-      },
       mediaTypeFilter: { mediaTypes: ["PHOTO"] },
     },
-    pageSize: 50,
+    pageSize: 100,
   };
 
   const res = await fetch("https://photoslibrary.googleapis.com/v1/mediaItems:search", {
